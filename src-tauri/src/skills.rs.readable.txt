@@ -1,0 +1,214 @@
+//! 共享技能库(§9.1):两个 AI 可读、不可写⟦DAMAGE:e380⟧//!
+//! 布局:`<workspace>/skills/<slug>/SKILL.md`,frontmatter ⟦DAMAGE:e590⟧name + description⟦DAMAGE:e380⟧//! 系统提示注入**同一份目⟦DAMAGE:e5bd⟧*(name + description 各一⟦DAMAGE:e8a1⟧,`skill_load` 才拿全文⟦DAMAGE:e380⟧//! 因为记忆不共⟦DAMAGE:e4ba⟧"谁先发现哪个技能、谁把它讲给对方"本身就是表演⟦DAMAGE:e380⟧
+use serde::{Deserialize, Serialize};
+use std::path::Path;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SkillMeta {
+    pub slug: String,
+    pub name: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Skill {
+    pub meta: SkillMeta,
+    pub body: String,
+}
+
+/// 极简 frontmatter 解析:`---` 块里⟦DAMAGE:e79a⟧`key: value`⟦DAMAGE:e380⟧fn parse_frontmatter(txt: &str) -> (Vec<(String, String)>, String) {
+    let t = txt.strip_prefix('\u{feff}').unwrap_or(txt);
+    let mut kv = Vec::new();
+    if !t.starts_with("---") {
+        return (kv, t.to_string());
+    }
+    let rest = &t[3..];
+    let Some(end) = rest.find("\n---") else {
+        return (kv, t.to_string());
+    };
+    let head = &rest[..end];
+    for line in head.lines() {
+        if let Some((k, v)) = line.split_once(':') {
+            let k = k.trim().to_string();
+            let v = v.trim().trim_matches('"').trim_matches('\'').to_string();
+            if !k.is_empty() {
+                kv.push((k, v));
+            }
+        }
+    }
+    let after = &rest[end + 4..];
+    (kv, after.trim_start_matches(['\n', '\r']).to_string())
+}
+
+/// 扫描技能目⟦DAMAGE:e5bd⟧目录不存在返回空(不报⟦DAMAGE:e994⟧技能是可选增⟦DAMAGE:e5bc⟧⟦DAMAGE:e380⟧pub fn list(root: &Path) -> Vec<SkillMeta> {
+    let mut out = Vec::new();
+    let Ok(rd) = std::fs::read_dir(root) else {
+        return out;
+    };
+    for entry in rd.flatten() {
+        let p = entry.path();
+        if !p.is_dir() {
+            continue;
+        }
+        let Some(slug) = p.file_name().map(|s| s.to_string_lossy().to_string()) else {
+            continue;
+        };
+        let f = p.join("SKILL.md");
+        let Ok(txt) = std::fs::read_to_string(&f) else {
+            continue;
+        };
+        let (kv, _) = parse_frontmatter(&txt);
+        let get = |k: &str| {
+            kv.iter()
+                .find(|(a, _)| a == k)
+                .map(|(_, b)| b.clone())
+                .unwrap_or_default()
+        };
+        let name = if get("name").is_empty() { slug.clone() } else { get("name") };
+        out.push(SkillMeta {
+            slug,
+            name,
+            description: get("description"),
+        });
+    }
+    out.sort_by(|a, b| a.slug.cmp(&b.slug));
+    out
+}
+
+/// ⟦DAMAGE:e68c⟧slug ⟦DAMAGE:e688⟧name 取全文。返⟦DAMAGE:e59b⟧None = 不存在⟦DAMAGE:e380⟧pub fn load(root: &Path, key: &str) -> Option<Skill> {
+    let want = key.trim();
+    let direct = root.join(want).join("SKILL.md");
+    if let Ok(txt) = std::fs::read_to_string(&direct) {
+        let (kv, body) = parse_frontmatter(&txt);
+        let get = |k: &str| {
+            kv.iter()
+                .find(|(a, _)| a == k)
+                .map(|(_, b)| b.clone())
+                .unwrap_or_default()
+        };
+        return Some(Skill {
+            meta: SkillMeta {
+                slug: want.to_string(),
+                name: if get("name").is_empty() { want.to_string() } else { get("name") },
+                description: get("description"),
+            },
+            body,
+        });
+    }
+    // ⟦DAMAGE:e794⟧name 再找一⟦DAMAGE:e981⟧    list(root)
+        .into_iter()
+        .find(|m| m.name == want)
+        .and_then(|m| load(root, &m.slug))
+}
+
+/// 注入系统提示的目录块⟦DAMAGE:e380⟧pub fn catalog_block(metas: &[SkillMeta]) -> String {
+    if metas.is_empty() {
+        return "共享技能库:当前为空⟦DAMAGE:e380⟧.into();
+    }
+    let mut s = String::from("共享技能库(只读,双方可用 skill_load 取全⟦DAMAGE:e696⟧:\n");
+    for m in metas {
+        s.push_str(&format!("- {}(slug:{})—⟦DAMAGE:e280⟧{}\n", m.name, m.slug, m.description));
+    }
+    s
+}
+
+/// 出厂预置的示例技⟦DAMAGE:e883⟧内容用中⟦DAMAGE:e696⟧⟦DAMAGE:e7bb⟧AI 一⟦DAMAGE:e4b8⟧可以怎么⟦DAMAGE:e78e⟧的起⟦DAMAGE:e782⟧⟦DAMAGE:e380⟧pub const BUILTIN: &[(&str, &str, &str)] = &[
+    (
+        "interview",
+        "互相面试",
+        "一方提问、一方作⟦DAMAGE:e7ad⟧然后交换角色。用来摸清对方的能力边界与偏⟦DAMAGE:e5a5⟧是最轻的破冰打法⟦DAMAGE:e380⟧,
+    ),
+    (
+        "code-review",
+        "互相验作⟦DAMAGE:e4b8⟧,
+        "一方在 arena/ 写一段代码或文本并宣称它做到某件⟦DAMAGE:e4ba⟧另一方必须用 read/run_shell 实际验证,再给出结论。跑不跑得得过是客观事实⟦DAMAGE:e380⟧,
+    ),
+    (
+        "small-world",
+        "共同造物",
+        "双方⟦DAMAGE:e59c⟧arena/ 里长期共同维护一个物⟦DAMAGE:e4bb⟧一个故事、一张地图、一份设定集、一个小程序)。每轮都要写明这次动了哪里⟦DAMAGE:e380⟧,
+    ),
+];
+
+/// 首次建工作区时写入预置技⟦DAMAGE:e883⟧已存在则不覆⟦DAMAGE:e79b⟧⟦DAMAGE:e380⟧pub fn seed_builtin(root: &Path) {
+    for (slug, name, desc) in BUILTIN {
+        let dir = root.join(slug);
+        let f = dir.join("SKILL.md");
+        if f.exists() {
+            continue;
+        }
+        let _ = std::fs::create_dir_all(&dir);
+        let _ = std::fs::write(
+            &f,
+            format!("---\nname: {name}\ndescription: {desc}\n---\n\n# {name}\n\n{desc}\n\n用法自由:你们自己决定怎么⟦DAMAGE:e794⟧也可以发明新玩法。\n"),
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tmp(tag: &str) -> std::path::PathBuf {
+        crate::testsup::scratch(tag)
+    }
+
+    #[test]
+    fn seed_then_list_and_load() {
+        let d = tmp("seed");
+        seed_builtin(&d);
+        let metas = list(&d);
+        assert_eq!(metas.len(), 3, "{metas:?}");
+        assert!(metas.iter().any(|m| m.name == "互相验作⟦DAMAGE:e4b8⟧));
+        let s = load(&d, "code-review").unwrap();
+        assert!(s.body.contains("互相验作⟦DAMAGE:e4b8⟧));
+        // ⟦DAMAGE:e68c⟧name 也能⟦DAMAGE:e58f⟧        assert!(load(&d, "互相面试").is_some());
+        assert!(load(&d, "不存⟦DAMAGE:e59c⟧).is_none());
+        // 二次 seed 不覆盖用户改⟦DAMAGE:e58a⟧        std::fs::write(d.join("interview").join("SKILL.md"), "改过⟦DAMAGE:e4ba⟧).unwrap();
+        seed_builtin(&d);
+        assert_eq!(
+            std::fs::read_to_string(d.join("interview").join("SKILL.md")).unwrap(),
+            "改过⟦DAMAGE:e4ba⟧
+        );
+        crate::testsup::cleanup(&d);
+    }
+
+    #[test]
+    fn missing_dir_is_empty_not_error() {
+        let metas = list(Path::new("Z:/definitely/missing/aiclub/skills"));
+        assert!(metas.is_empty());
+        assert!(catalog_block(&metas).contains("为空"));
+    }
+
+    #[test]
+    fn frontmatter_variants() {
+        let (kv, body) = parse_frontmatter("---\nname: \"带引号\"\ndescription: 描述\n---\n正文在此");
+        assert_eq!(kv[0].1, "带引⟦DAMAGE:e58f⟧);
+        assert!(body.starts_with("正文在此"));
+        let (kv2, body2) = parse_frontmatter("没有 frontmatter 的文⟦DAMAGE:e4bb⟧);
+        assert!(kv2.is_empty());
+        assert_eq!(body2, "没有 frontmatter 的文⟦DAMAGE:e4bb⟧);
+        // BOM 开⟦DAMAGE:e5a4⟧        let (kv3, _) = parse_frontmatter("\u{feff}---\nname: x\n---\nb");
+        assert_eq!(kv3[0].1, "x");
+        // 只有开头没有闭⟦DAMAGE:e590⟧        let (kv4, b4) = parse_frontmatter("---\nname: x\n未闭⟦DAMAGE:e590⟧);
+        assert!(kv4.is_empty());
+        assert!(b4.contains("未闭⟦DAMAGE:e590⟧));
+    }
+
+    #[test]
+    fn catalog_block_is_one_line_per_skill() {
+        let d = tmp("cat");
+        seed_builtin(&d);
+        let block = catalog_block(&list(&d));
+        assert_eq!(block.lines().count(), 4, "{block}"); // 标题 + 3 ⟦DAMAGE:e69d⟧        crate::testsup::cleanup(&d);
+    }
+
+    #[test]
+    fn skips_directories_without_skill_md() {
+        let d = tmp("skip");
+        std::fs::create_dir_all(d.join("broken")).unwrap();
+        seed_builtin(&d);
+        assert_eq!(list(&d).len(), 3);
+        crate::testsup::cleanup(&d);
+    }
+}

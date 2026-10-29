@@ -1,0 +1,142 @@
+/* ─────────────────────────────────────────────────────────────
+   AiClub 令牌层 —— 全项目唯一允许出现具体色值的地方。
+   契约见 docs/specs/2026-10-12-aiclub-design.md §10.2。
+
+   规矩(违反即 CI 红):
+   1. 本文件是唯一写色值的地方;surface.css / app.css 一律用 var()。
+   2. 文字令牌必须在**它可能落到的每一档表面**上过 4.5:1。
+      改任何色值后必须重跑 `node tools/contrast.mjs`,先跑脚本再说话。
+   3. 零彩色:语义状态靠形状 + 文字 + 位置三重冗余,不靠色相。
+   4. 层级靠明度不靠透明度;内容面一律实色(半透明只给浮层)。
+   ───────────────────────────────────────────────────────────── */
+
+html[data-theme="dark"] {
+  /* ── 表面:画布 → 侧轨 → 纸面 → 抬升,另有下凹 --well ── */
+  --bg: #0a0a0c;
+  --bg-2: #0e0e11;
+  --rail: #131317;
+  --sheet: #1a1a1f;
+  --raised: #222229;
+  --well: #0e0e11;
+
+  /* ── 发丝线 ── */
+  --line: rgba(255, 255, 255, 0.10);
+  --line-soft: rgba(255, 255, 255, 0.06);
+  --line-strong: rgba(255, 255, 255, 0.18);
+
+  /* ── 四级文字 ── */
+  --tx-1: #f1f2f5;
+  --tx-2: #bcc0c8;
+  --tx-3: #9aa0a9;
+  --tx-dim: #858b93;
+
+  /* ── 墨向极性(身份编码,不是强调色) ── */
+  --ink: #f1f2f5;
+  --on-ink: #0a0a0c;
+
+  /* ── 交互态 ── */
+  --hover: rgba(255, 255, 255, 0.06);
+  --active: rgba(255, 255, 255, 0.10);
+  --selected: rgba(255, 255, 255, 0.10);
+  --scrim: rgba(0, 0, 0, 0.62);
+
+  /* ── 浮层材质(只给标题栏;内容面绝不半透明) ── */
+  --glass: color-mix(in srgb, var(--sheet) 72%, transparent);
+  --glass-line: rgba(255, 255, 255, 0.10);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 32px rgba(0, 0, 0, 0.55);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+
+  color-scheme: dark;
+}
+
+html[data-theme="light"] {
+  --bg: #f2f3f6;
+  --bg-2: #eceef2;
+  --rail: #f7f8fa;
+  --sheet: #ffffff;
+  --raised: #ffffff;
+  --well: #f4f6f9;
+
+  --line: rgba(24, 28, 36, 0.13);
+  --line-soft: rgba(24, 28, 36, 0.07);
+  --line-strong: rgba(24, 28, 36, 0.24);
+
+  --tx-1: #101216;
+  --tx-2: #3d434d;
+  --tx-3: #5a6069;
+  --tx-dim: #636a75;
+
+  --ink: #101216;
+  --on-ink: #ffffff;
+
+  --hover: rgba(24, 28, 36, 0.05);
+  --active: rgba(24, 28, 36, 0.09);
+  --selected: rgba(16, 18, 22, 0.07);
+  --scrim: rgba(16, 18, 22, 0.34);
+
+  --glass: color-mix(in srgb, var(--sheet) 72%, transparent);
+  --glass-line: rgba(24, 28, 36, 0.13);
+  --shadow: 0 1px 2px rgba(16, 18, 22, 0.06), 0 12px 32px rgba(16, 18, 22, 0.10);
+  --shadow-sm: 0 1px 2px rgba(16, 18, 22, 0.06);
+
+  color-scheme: light;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   几何(D-010:圆润)。CSS 原生圆角是圆弧而非 iOS 连续曲率,
+   近似处理:圆角 + overflow: clip,不引入 SVG mask。
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --r-xs: 6px;    /* 小徽标、代码行 */
+  --r-sm: 10px;   /* 输入井、小卡 */
+  --r-md: 14px;   /* 工具卡、列表行 */
+  --r-lg: 18px;   /* 气泡、卡片 */
+  --r-xl: 24px;   /* 浮层、模态 */
+  --r-cap: 999px; /* 按钮、身份胶囊、分段控件 */
+
+  --h-ctl-sm: 28px;
+  --h-ctl: 32px;
+  --h-ctl-lg: 36px;
+  --h-well: 40px;
+  --h-titlebar: 50px;
+  --h-statusbar: 30px;
+
+  /* ── 字体:Inter 出拉丁与数字,MiSans 出汉字;系统栈仅兜底 ── */
+  --font-ui: "Inter Variable", Inter, "MiSans VF", MiSans, -apple-system,
+    "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "PingFang SC",
+    "Microsoft YaHei UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "SF Mono", ui-monospace, Consolas,
+    "Microsoft YaHei Mono", monospace;
+
+  /* macOS 原生字形优先;Windows 保留原有回退栈 */
+  --font-ui-macos: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif;
+  --font-mono-macos: "SF Mono", "Menlo", ui-monospace, monospace;
+
+  /* 字号阶梯 23 / 19 / 15 / 14 / 13 / 12 / 11 */
+  --fs-2xl: 23px;
+  --fs-xl: 19px;
+  --fs-lg: 15px;
+  --fs-md: 14px;
+  --fs-sm: 13px;
+  --fs-xs: 12px;
+  --fs-2xs: 11px;
+
+  /* ── 动效:走弹簧,不用固定时长 keyframes ── */
+  --spring-response: 0.3;
+  --spring-damping: 1;
+  --dur-press: 100ms;
+  --dur-fade: 180ms;
+
+  --z-stage: 0;
+  --z-titlebar: 20;
+  --z-popover: 40;
+  --z-modal: 60;
+  --z-toast: 80;
+}
+
+/* 数字一律等宽对齐:轮次与 token 计数不能跳动 */
+.tnum,
+.count,
+.time {
+  font-variant-numeric: tabular-nums;
+}

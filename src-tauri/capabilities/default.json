@@ -1,0 +1,13 @@
+{
+  "identifier": "default",
+  "description": "主窗口默认能力:窗口控制、事件订阅、目录选择",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close",
+    "dialog:default"
+  ]
+}

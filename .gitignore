@@ -1,4 +1,4 @@
-﻿node_modules/
+node_modules/
 dist/
 src-tauri/target/
 src-tauri/gen/
@@ -6,3 +6,22 @@ run/
 *.tmp
 .DS_Store
 config.toml
+*.local
+.vite/
+coverage/
+
+# 本地验证证据、交接笔记与发行包
+.evidence/
+.md管理/
+release/
+
+# CI 待 token 授权 workflow scope 后再入库
+.github/workflows/
+
+# 凭据
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.log

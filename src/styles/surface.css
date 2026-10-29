@@ -1,0 +1,325 @@
+/* ─────────────────────────────────────────────────────────────
+   表面层:可复用容器与控件。这里**不出现任何具体色值**,只用 var()。
+   规矩:某个类要写颜色时,先问它是"令牌层"还是"表面层" —— 表面层只消费令牌。
+   ───────────────────────────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  line-height: 1.55;
+  color: var(--tx-1);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  /* 桌面应用:不需要文本选择与右键菜单的浏览器味 */
+  user-select: none;
+  cursor: default;
+}
+
+/* 台面与文件内容允许选中(那是"读"的地方) */
+.selectable, .selectable * { user-select: text; cursor: text; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: default; background: none; border: none; padding: 0; }
+a { color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--tx-1);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+:focus:not(:focus-visible) { outline: none; }
+
+/* ── 滚动条:细、无彩色 ── */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--tx-dim); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+
+/* ── 布局骨架 ── */
+.app {
+  display: grid;
+  grid-template-rows: var(--h-titlebar) 1fr var(--h-statusbar);
+  height: 100%;
+  position: relative;
+}
+.app-body { display: flex; min-height: 0; overflow: hidden; }
+.pane { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.rail {
+  width: 244px;
+  flex: 0 0 auto;
+  background: var(--rail);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* 侧栏内容(导航 + 操作 + 参与者 + 技能库 + 账目 + 设置/退出)在窗口变矮、
+     技能变多、或参与者信息换行时会超过可用高度。
+     父级 .app-body 是 overflow: hidden,所以这里必须自己能滚 ——
+     否则超出部分被直接裁掉且永远够不着。
+     实测(2026-10-14,窗口缩到 minHeight=600):内容自然高 780px、可用 520px,
+     被裁 260px,且 scrollTop 设成 100 读回来仍是 0(滚不动)。
+     2026-10-14 修复:overflow-y: auto。 */
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+/* 分组与卡片保持自然高度:空间不够时应该滚动,而不是把每张卡挤成一条。
+   .grow 是唯一的弹性占位(把账目推到下方),要留给它收缩的余地。 */
+.rail > *:not(.grow) { flex-shrink: 0; }
+/* 注:曾经有 .rail.collapsed,但 Sidebar 在收起时是 return null,
+   这个类永远不会被应用 —— 已删除,免得让人以为折叠是宽度动画。 */
+.main { flex: 1 1 auto; background: var(--bg); min-width: 0; }
+.side {
+  width: 340px;
+  flex: 0 0 auto;
+  background: var(--bg-2);
+  border-left: 1px solid var(--line);
+  min-height: 0;
+}
+
+/* ── 标题栏(自绘,decorations:false) ── */
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 0 0 14px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+  position: relative;
+  z-index: var(--z-titlebar);
+}
+/* 拖动由 .titlebar 上的 data-tauri-drag-region="deep" 负责(见 TitleBar.tsx)。
+   这里只留弹性占位,把窗控推到右边。
+   不要再加 -webkit-app-region:本机 WebView 不认这个属性,声明会被静默丢弃,
+   留着只会让人以为拖动还有第二条路。 */
+.titlebar .drag { flex: 1 1 auto; height: 100%; }
+.win-btns { display: flex; height: 100%; flex: 0 0 auto; }
+
+/* ── 按钮 ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--h-ctl);
+  padding: 0 12px;
+  border-radius: var(--r-cap);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--tx-1);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  transition: background var(--dur-press) ease, border-color var(--dur-press) ease;
+}
+.btn:hover:not(:disabled) { background: var(--hover); }
+.btn:active:not(:disabled) { background: var(--active); }
+.btn:disabled { color: var(--tx-dim); border-color: var(--line-soft); }
+
+/* 主操作:反色填充(黑底白字 / 白底黑字) */
+.btn.primary { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+.btn.primary:hover:not(:disabled) { opacity: 0.88; background: var(--ink); }
+.btn.primary:active:not(:disabled) { opacity: 0.76; }
+.btn.primary:disabled { background: transparent; color: var(--tx-dim); border-color: var(--line-soft); }
+
+/* 危险操作靠**形状**(实心描边)与文字表达,不靠红色 */
+.btn.danger { border-color: var(--line-strong); }
+.btn.danger:hover:not(:disabled) { background: var(--active); }
+
+.btn.ghost { border-color: transparent; }
+.btn.ghost:hover:not(:disabled) { background: var(--hover); }
+.btn.sm { height: var(--h-ctl-sm); padding: 0 10px; font-size: var(--fs-xs); }
+.btn.icon { width: var(--h-ctl); padding: 0; }
+.btn.icon.sm { width: var(--h-ctl-sm); }
+
+/* 窗口控制按钮:矩形、贴边、hover 才显形 */
+.win-btn {
+  width: 46px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--tx-2);
+  transition: background var(--dur-press) ease;
+}
+.win-btn:hover { background: var(--hover); color: var(--tx-1); }
+.win-btn.close:hover { background: var(--tx-1); color: var(--on-ink); }
+
+/* ── 表单 ── */
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field > label { font-size: var(--fs-xs); color: var(--tx-3); }
+.hint { font-size: var(--fs-xs); color: var(--tx-dim); line-height: 1.5; }
+
+.input, .select, .textarea {
+  height: var(--h-well);
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--well);
+  color: var(--tx-1);
+  width: 100%;
+  transition: border-color var(--dur-fade) ease;
+}
+.textarea { height: auto; padding: 10px 12px; resize: vertical; min-height: 76px; line-height: 1.6; }
+.input:hover, .select:hover, .textarea:hover { border-color: var(--line-strong); }
+.input:focus, .select:focus, .textarea:focus {
+  outline: none;
+  border-color: var(--tx-1);
+}
+.input::placeholder, .textarea::placeholder { color: var(--tx-dim); }
+.input.mono { font-family: var(--font-mono); font-size: var(--fs-sm); }
+
+/* 分段控件 */
+.seg {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r-cap);
+}
+.seg > button {
+  height: 26px;
+  padding: 0 12px;
+  border-radius: var(--r-cap);
+  font-size: var(--fs-xs);
+  color: var(--tx-3);
+  transition: background var(--dur-press) ease, color var(--dur-press) ease;
+}
+.seg > button:hover { color: var(--tx-1); }
+.seg > button[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
+
+/* 开关 */
+.switch {
+  width: 40px; height: 24px;
+  border-radius: 999px;
+  background: var(--well);
+  border: 1px solid var(--line);
+  position: relative;
+  flex: 0 0 auto;
+  transition: background var(--dur-fade) ease;
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--tx-3);
+  transition: transform var(--dur-fade) cubic-bezier(0.32, 0.72, 0, 1), background var(--dur-fade) ease;
+}
+.switch[aria-checked="true"] { background: var(--ink); border-color: var(--ink); }
+.switch[aria-checked="true"]::after { transform: translateX(16px); background: var(--on-ink); }
+
+/* ── 卡片 / 分区 ── */
+.card {
+  background: var(--sheet);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 14px;
+}
+.well {
+  background: var(--well);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-md);
+}
+.section-title {
+  font-size: var(--fs-xs);
+  color: var(--tx-3);
+  letter-spacing: 0.04em;
+  padding: 0 4px 8px;
+}
+
+/* ── 徽标 / 胶囊 ── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--r-cap);
+  border: 1px solid var(--line);
+  font-size: var(--fs-2xs);
+  color: var(--tx-3);
+  white-space: nowrap;
+}
+.chip.solid { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+
+/* ── 身份编码(A 左实心 / B 右描边,形状 + 位置 + 文字三重冗余) ── */
+.mono { font-family: var(--font-mono); }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* ── 空状态 ── */
+.empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--tx-dim);
+  text-align: center;
+  padding: 32px;
+}
+.empty .big { font-size: var(--fs-xl); color: var(--tx-2); }
+
+/* ── 状态栏 ── */
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 14px;
+  background: var(--bg-2);
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-2xs);
+  color: var(--tx-3);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.statusbar .sep { width: 1px; height: 14px; background: var(--line); flex: 0 0 auto; }
+.statusbar .grow { flex: 1 1 auto; }
+
+/* 状态点:形状 + 文字,不靠颜色 */
+.dot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--tx-3); flex: 0 0 auto; }
+.dot.on { background: var(--tx-1); border-color: var(--tx-1); }
+.dot.paused { background: transparent; border-color: var(--tx-2); }
+.dot.solid2 { background: var(--tx-2); border-color: var(--tx-2); }
+
+/* ── 通用工具类 ── */
+.row { display: flex; align-items: center; gap: 8px; }
+.col { display: flex; flex-direction: column; }
+.grow { flex: 1 1 auto; min-width: 0; }
+.nowrap { white-space: nowrap; }
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scroll { overflow: auto; min-height: 0; flex: 1 1 auto; }
+.hidden { display: none !important; }
+.pad { padding: 14px; }
+.gap-4 { gap: 4px; }
+.gap-6 { gap: 6px; }
+.gap-8 { gap: 8px; }
+.gap-10 { gap: 10px; }
+.gap-14 { gap: 14px; }
+.dim { color: var(--tx-dim); }
+.t3 { color: var(--tx-3); }
+.t2 { color: var(--tx-2); }
+.xs { font-size: var(--fs-xs); }
+.xxs { font-size: var(--fs-2xs); }
+.right { text-align: right; }
+
+/* 尊重系统的「减少动态效果」(可访问性) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
